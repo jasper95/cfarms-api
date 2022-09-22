@@ -1,0 +1,11 @@
+table:
+  name: farm
+  schema: public
+array_relationships:
+  - name: commodities
+    using:
+      foreign_key_constraint_on:
+        column: farmId
+        table:
+          name: commodity
+          schema: public

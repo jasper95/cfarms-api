@@ -1,0 +1,7 @@
+table:
+  name: annualInfo
+  schema: public
+object_relationships:
+  - name: household
+    using:
+      foreign_key_constraint_on: householdId

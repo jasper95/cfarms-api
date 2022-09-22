@@ -1,0 +1,11 @@
+table:
+  name: household
+  schema: public
+array_relationships:
+  - name: annualInfos
+    using:
+      foreign_key_constraint_on:
+        column: householdId
+        table:
+          name: annualInfo
+          schema: public

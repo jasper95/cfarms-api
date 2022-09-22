@@ -1,0 +1,6 @@
+- "!include public_annualInfo.yaml"
+- "!include public_association.yaml"
+- "!include public_commodity.yaml"
+- "!include public_farm.yaml"
+- "!include public_household.yaml"
+- "!include public_program.yaml"
