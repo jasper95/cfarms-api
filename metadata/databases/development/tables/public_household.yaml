@@ -9,3 +9,10 @@ array_relationships:
         table:
           name: annualInfo
           schema: public
+  - name: farms
+    using:
+      foreign_key_constraint_on:
+        column: householdId
+        table:
+          name: farm
+          schema: public

@@ -1,0 +1,3 @@
+table:
+  name: associationToProgram
+  schema: public

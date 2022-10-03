@@ -15,31 +15,6 @@ CREATE TABLE public.association (
 	CONSTRAINT association_pk PRIMARY KEY (id)
 );
 
-
--- public.farm definition
-
--- Drop table
-
--- DROP TABLE public.farm;
-
-CREATE TABLE public.farm (
-	"ownerName" varchar NOT NULL DEFAULT '',
-	"ownershipDocument" varchar NOT NULL DEFAULT '',
-	"ownershipType" varchar NOT NULL DEFAULT '',
-	"location" jsonb NULL,
-	"sizeInHaTotal" numeric NOT NULL,
-	"isAgrarianReformBeneficiary" boolean NOT NULL,
-	"withinAncestralDomain" boolean NOT NULL,
-	"id" uuid NOT NULL DEFAULT gen_random_uuid(),
-	"barangay" varchar NOT NULL DEFAULT '',
-	"municipality" varchar NOT NULL DEFAULT 'Candijay',
-	"farmType" varchar NOT NULL DEFAULT '',
-	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
-	CONSTRAINT farm_pk PRIMARY KEY (id)
-);
-
-
 -- public."program" definition
 
 -- Drop table
@@ -70,11 +45,9 @@ CREATE TABLE public.commodity (
 	"commodityType" varchar NOT NULL DEFAULT '',
 	"commodity" varchar NOT NULL DEFAULT '',
 	"id" uuid NOT NULL DEFAULT gen_random_uuid(),
-	"farmId" uuid NULL,
 	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
 	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
-	CONSTRAINT crop_commodity_pk PRIMARY KEY (id),
-	CONSTRAINT commodity_fk FOREIGN KEY ("farmId") REFERENCES public.farm(id) ON DELETE NO ACTION ON UPDATE NO ACTION
+	CONSTRAINT crop_commodity_pk PRIMARY KEY (id)
 );
 
 
@@ -120,6 +93,33 @@ CREATE TABLE public.household (
 	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
 	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
 	CONSTRAINT household_pk PRIMARY KEY (id)
+);
+
+
+-- public.farm definition
+
+-- Drop table
+
+-- DROP TABLE public.farm;
+
+CREATE TABLE public.farm (
+	"ownerName" varchar NOT NULL DEFAULT '',
+	"ownershipDocument" varchar NOT NULL DEFAULT '',
+	"ownershipType" varchar NOT NULL DEFAULT '',
+	"name" varchar NOT NULL DEFAULT '',
+	"location" jsonb NULL,
+	"sizeInHaTotal" numeric NOT NULL,
+	"isAgrarianReformBeneficiary" boolean NOT NULL,
+	"withinAncestralDomain" boolean NOT NULL,
+	"id" uuid NOT NULL DEFAULT gen_random_uuid(),
+	"householdId" uuid NOT NULL,
+	"barangay" varchar NOT NULL DEFAULT '',
+	"municipality" varchar NOT NULL DEFAULT 'Candijay',
+	"farmType" varchar NOT NULL DEFAULT '',
+	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+	CONSTRAINT farm_pk PRIMARY KEY (id),
+	CONSTRAINT farm_fk_1 FOREIGN KEY ("householdId") REFERENCES public.household(id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
 
 
@@ -184,6 +184,7 @@ CREATE TABLE public."annualInfo" (
 CREATE TABLE public."commodityProduceInventory" (
 	"id" uuid NOT NULL DEFAULT gen_random_uuid(),
 	"commodityId" uuid NOT NULL,
+	"farmId" uuid NOT NULL,
 	"produce" float8 NULL,
 	"organicPractitioner" boolean NOT NULL,
 	"householdId" uuid NOT NULL,
@@ -193,5 +194,7 @@ CREATE TABLE public."commodityProduceInventory" (
 	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
 	CONSTRAINT commodityproduceinventory_pk PRIMARY KEY (id),
 	CONSTRAINT commodityproduceinventory_fk FOREIGN KEY ("commodityId") REFERENCES public.commodity(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-	CONSTRAINT commodityproduceinventory_fk2 FOREIGN KEY ("householdId") REFERENCES public.household(id) ON DELETE NO ACTION ON UPDATE NO ACTION
+	CONSTRAINT commodityproduceinventory_fk2 FOREIGN KEY ("householdId") REFERENCES public.household(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+	CONSTRAINT commodityproduceinventory_fk3 FOREIGN KEY ("farmId") REFERENCES public.farm(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+	CONSTRAINT commodityproduceinventory_unique UNIQUE ("farmId", "commodityId", "year")
 );
