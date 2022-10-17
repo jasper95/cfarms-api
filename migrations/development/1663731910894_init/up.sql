@@ -43,7 +43,7 @@ CREATE TABLE public."program" (
 
 CREATE TABLE public.commodity (
 	"commodityType" varchar NOT NULL DEFAULT '',
-	"commodity" varchar NOT NULL DEFAULT '',
+	"name" varchar NOT NULL DEFAULT '',
 	"id" uuid NOT NULL DEFAULT gen_random_uuid(),
 	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
 	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
@@ -132,9 +132,10 @@ CREATE TABLE public.farm (
 CREATE TABLE public."householdToProgram" (
 	"id" uuid NOT NULL DEFAULT gen_random_uuid(),
 	"programId" uuid NOT NULL,
-	"householdId" uuid NULL,
-	"dateAvailed" date NULL,
+	"householdId" uuid NOT NULL,
 	"remarks" varchar NOT NULL DEFAULT '',
+	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
 	CONSTRAINT programavailment_fk_1 FOREIGN KEY ("householdId") REFERENCES public.household(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
 	CONSTRAINT programavailment_fk_2 FOREIGN KEY ("programId") REFERENCES public."program"(id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
@@ -142,9 +143,10 @@ CREATE TABLE public."householdToProgram" (
 CREATE TABLE public."associationToProgram" (
 	"id" uuid NOT NULL DEFAULT gen_random_uuid(),
 	"programId" uuid NOT NULL,
-	"associationId" uuid NULL,
-	"dateAvailed" date NULL,
+	"associationId" uuid NOT NULL,
 	"remarks" varchar NOT NULL DEFAULT '',
+	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
 	CONSTRAINT programavailment_fk FOREIGN KEY ("associationId") REFERENCES public.association(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
 	CONSTRAINT programavailment_fk_2 FOREIGN KEY ("programId") REFERENCES public."program"(id) ON DELETE NO ACTION ON UPDATE NO ACTION
 );
@@ -171,7 +173,8 @@ CREATE TABLE public."annualInfo" (
 	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
 	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
 	CONSTRAINT annualinfo_pk PRIMARY KEY (id),
-	CONSTRAINT annualinfo_fk FOREIGN KEY ("householdId") REFERENCES public.household(id)
+	CONSTRAINT annualinfo_fk FOREIGN KEY ("householdId") REFERENCES public.household(id),
+	CONSTRAINT annualinfo_unique UNIQUE ("householdId", "year")
 );
 
 
@@ -181,7 +184,7 @@ CREATE TABLE public."annualInfo" (
 
 -- DROP TABLE public."commodityProduceInventory";
 
-CREATE TABLE public."commodityProduceInventory" (
+CREATE TABLE public."commodityProduce" (
 	"id" uuid NOT NULL DEFAULT gen_random_uuid(),
 	"commodityId" uuid NOT NULL,
 	"farmId" uuid NOT NULL,
@@ -192,9 +195,118 @@ CREATE TABLE public."commodityProduceInventory" (
 	"areaUsed" float8 NOT NULL,
 	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
 	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
-	CONSTRAINT commodityproduceinventory_pk PRIMARY KEY (id),
-	CONSTRAINT commodityproduceinventory_fk FOREIGN KEY ("commodityId") REFERENCES public.commodity(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-	CONSTRAINT commodityproduceinventory_fk2 FOREIGN KEY ("householdId") REFERENCES public.household(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-	CONSTRAINT commodityproduceinventory_fk3 FOREIGN KEY ("farmId") REFERENCES public.farm(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
-	CONSTRAINT commodityproduceinventory_unique UNIQUE ("farmId", "commodityId", "year")
+	CONSTRAINT commodityproduce_pk PRIMARY KEY (id),
+	CONSTRAINT commodityproduce_fk FOREIGN KEY ("commodityId") REFERENCES public.commodity(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+	CONSTRAINT commodityproduce_fk2 FOREIGN KEY ("householdId") REFERENCES public.household(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+	CONSTRAINT commodityproduce_fk3 FOREIGN KEY ("farmId") REFERENCES public.farm(id) ON DELETE NO ACTION ON UPDATE NO ACTION,
+	CONSTRAINT commodityproduce_unique UNIQUE ("farmId", "commodityId", "year")
 );
+
+
+CREATE OR REPLACE VIEW "public"."produce" AS 
+ SELECT DISTINCT "commodityProduce".id,
+    "commodityProduce"."commodityId",
+    "commodityProduce".produce,
+    "commodityProduce"."organicPractitioner",
+    "commodityProduce"."householdId",
+    "commodityProduce".year,
+    "commodityProduce"."areaUsed",
+    "commodityProduce"."farmId",
+    commodity.name AS "commodityName",
+    farm.name AS "farmName",
+    "commodityProduce"."createdAt"
+   FROM (("commodityProduce"
+     JOIN commodity ON (("commodityProduce"."commodityId" = commodity.id)))
+     LEFT JOIN farm ON (("commodityProduce"."farmId" = farm.id)));
+
+
+CREATE OR REPLACE VIEW "public"."averageAnnualIncome" AS
+SELECT
+  sum(
+    (
+      COALESCE(
+        "annualInfo"."grossAnnualIncomeFarming",
+        (0) :: numeric
+      ) + COALESCE(
+        "annualInfo"."grossAnnualIncomeNonfarming",
+        (0) :: numeric
+      )
+    )
+  ) AS averageinfo,
+  "annualInfo".year
+FROM
+  "annualInfo"
+GROUP BY
+  "annualInfo".year;
+
+CREATE OR REPLACE VIEW "public"."inventoryOfLivestock" AS
+SELECT
+  sum("commodityProduce".produce) AS sum,
+  "commodityProduce".year
+FROM
+  (
+    "commodityProduce"
+    JOIN commodity ON (
+      (
+        (commodity.id = "commodityProduce"."commodityId")
+        AND (
+          (commodity."commodityType") :: text = 'Livestock' :: text
+        )
+      )
+    )
+  )
+GROUP BY
+  "commodityProduce".year;
+
+CREATE OR REPLACE VIEW "public"."registeredHouseholdPerYear" AS
+SELECT
+  count(household.id) AS count,
+  "annualInfo".year
+FROM
+  (
+    household
+    JOIN "annualInfo" ON ((household.id = "annualInfo"."householdId"))
+  )
+GROUP BY
+  "annualInfo".year;
+
+CREATE OR REPLACE VIEW "public"."householdPrograms" AS 
+ SELECT
+	household.id,
+  household.barangay,
+  household."firstName",
+  household."lastName",
+  household."referenceNo",
+	COALESCE(jsonb_agg("householdToProgram"."programId") FILTER (WHERE "householdToProgram"."programId" IS NOT NULL), '[]') AS "programIds",
+	sum(farm."sizeInHaTotal") AS "farmSize",
+	"annualInfo"."grossAnnualIncomeFarming",
+	"annualInfo"."grossAnnualIncomeNonfarming"
+FROM
+	household
+	LEFT JOIN "annualInfo" ON "annualInfo"."householdId" = household.id and "annualInfo"."year" = date_part('year', (SELECT current_timestamp))
+	LEFT JOIN "householdToProgram" ON household.id = "householdToProgram"."householdId"
+	LEFT JOIN farm ON farm."householdId" = household.id
+GROUP BY
+	household.id,
+	"annualInfo"."id";
+
+CREATE OR REPLACE VIEW "public"."programBeneficiaries" AS 
+ SELECT "householdToProgram".id,
+    "householdToProgram"."programId",
+    "householdToProgram"."householdId",
+    "householdToProgram"."createdAt",
+    household."firstName",
+     household."barangay",
+     household."referenceNo",
+    household."lastName",
+		  household."createdAt",
+    "annualInfo"."grossAnnualIncomeFarming",
+    "annualInfo"."grossAnnualIncomeNonfarming",
+    farm."farmSize"
+   FROM ((("householdToProgram"
+     LEFT JOIN household ON ((household.id = "householdToProgram"."householdId")))
+     LEFT JOIN "annualInfo" ON ((("annualInfo"."householdId" = "householdToProgram"."householdId") AND (("annualInfo".year)::double precision = date_part('year'::text, ( SELECT CURRENT_TIMESTAMP AS "current_timestamp"))))))
+     LEFT JOIN ( SELECT farm_1."householdId",
+            sum(farm_1."sizeInHaTotal") AS "farmSize"
+           FROM farm farm_1
+          GROUP BY farm_1."householdId") farm ON ((farm."householdId" = "householdToProgram"."householdId")));

@@ -1,0 +1,7 @@
+table:
+  name: commodityProduce
+  schema: public
+object_relationships:
+  - name: farm
+    using:
+      foreign_key_constraint_on: farmId
