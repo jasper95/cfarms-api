@@ -1,6 +1,6 @@
 version: 3
-endpoint: https://hasura-haop.onrender.com
+endpoint: https://hasura-a08a.onrender.com
 metadata_directory: metadata
 actions:
   kind: synchronous
-  handler_webhook_baseurl: https://hasura-haop.onrender.com
+  handler_webhook_baseurl: https://hasura-a08a.onrender.com

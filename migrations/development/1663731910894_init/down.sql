@@ -1,9 +1,12 @@
-DROP VIEW public."produce";
-DROP VIEW public."householdPrograms";
-DROP VIEW public."programBeneficiaries";
-DROP VIEW public."inventoryOfLivestock";
-DROP VIEW public."registeredHouseholdPerYear";
-DROP VIEW public."averageAnnualIncome";
+-- DROP VIEW public."produce";
+-- DROP VIEW public."householdPrograms";
+-- DROP VIEW public."programBeneficiaries";
+-- DROP VIEW public."inventoryOfLivestock";
+-- DROP VIEW public."registeredHouseholdPerYear";
+-- DROP VIEW public."averageAnnualIncome";
+-- DROP VIEW public."associationPrograms";
+-- DROP VIEW public."associationBeneficiaries";
+-- DROP TABLE public."user";
 DROP TABLE public."commodityProduce";
 DROP TABLE public."annualInfo";
 DROP TABLE public."associationToProgram";

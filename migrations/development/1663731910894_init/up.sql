@@ -203,26 +203,72 @@ CREATE TABLE public."commodityProduce" (
 );
 
 
-CREATE OR REPLACE VIEW "public"."produce" AS 
- SELECT DISTINCT "commodityProduce".id,
-    "commodityProduce"."commodityId",
-    "commodityProduce".produce,
-    "commodityProduce"."organicPractitioner",
-    "commodityProduce"."householdId",
-    "commodityProduce".year,
-    "commodityProduce"."areaUsed",
-    "commodityProduce"."farmId",
-    commodity.name AS "commodityName",
-    farm.name AS "farmName",
-    "commodityProduce"."createdAt"
-   FROM (("commodityProduce"
-     JOIN commodity ON (("commodityProduce"."commodityId" = commodity.id)))
-     LEFT JOIN farm ON (("commodityProduce"."farmId" = farm.id)));
+CREATE TYPE "public"."userRoleEnum" AS ENUM ('administrator', 'manager', 'encoder');
+
+-- -- Table Definition
+CREATE TABLE "public"."user" (
+	"id" uuid NOT NULL DEFAULT gen_random_uuid(),
+	"firstName" text NOT NULL DEFAULT '',
+	"lastName" text NOT NULL DEFAULT '',
+	"username" text NOT NULL,
+	"active" bool NOT NULL DEFAULT true,
+	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
+	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+	"role" "public"."userRoleEnum" NOT NULL,
+	CONSTRAINT user_pk PRIMARY KEY (id)
+);
 
 
-CREATE OR REPLACE VIEW "public"."averageAnnualIncome" AS
+CREATE
+OR REPLACE VIEW "public"."associationBeneficiaries" AS
 SELECT
-  sum(
+  "associationToProgram".id,
+  "associationToProgram"."programId",
+  "associationToProgram"."associationId",
+  "associationToProgram"."createdAt",
+  association.name,
+  association.active
+FROM
+  (
+    "associationToProgram"
+    LEFT JOIN association ON (
+      (
+        "associationToProgram"."associationId" = association.id
+      )
+    )
+  );
+
+
+CREATE OR REPLACE VIEW "public"."associationPrograms" AS
+SELECT
+  association.id,
+  association.name,
+  association.active,
+  COALESCE(
+    jsonb_agg("associationToProgram"."programId") FILTER (
+      WHERE
+        ("associationToProgram"."programId" IS NOT NULL)
+    ),
+    '[]' :: jsonb
+  ) AS "programIds",
+  association."createdAt"
+FROM
+  (
+    association
+    LEFT JOIN "associationToProgram" ON (
+      (
+        association.id = "associationToProgram"."associationId"
+      )
+    )
+  )
+GROUP BY
+  association.id;
+
+
+CREATE
+OR REPLACE VIEW "public"."averageAnnualIncome" AS
+SELECT
+  avg(
     (
       COALESCE(
         "annualInfo"."grossAnnualIncomeFarming",
@@ -233,13 +279,16 @@ SELECT
       )
     )
   ) AS averageinfo,
+  avg("annualInfo"."grossAnnualIncomeFarming") AS "annualIncomeFarming",
+  avg("annualInfo"."grossAnnualIncomeNonfarming") AS "annualIncomeNonfarming",
   "annualInfo".year
 FROM
   "annualInfo"
 GROUP BY
   "annualInfo".year;
 
-CREATE OR REPLACE VIEW "public"."inventoryOfLivestock" AS
+CREATE
+OR REPLACE VIEW "public"."inventoryOfLivestock" AS
 SELECT
   sum("commodityProduce".produce) AS sum,
   "commodityProduce".year
@@ -258,55 +307,97 @@ FROM
 GROUP BY
   "commodityProduce".year;
 
-CREATE OR REPLACE VIEW "public"."registeredHouseholdPerYear" AS
+CREATE
+OR REPLACE VIEW "public"."produce" AS
 SELECT
-  count(household.id) AS count,
-  "annualInfo".year
+  DISTINCT "commodityProduce".id,
+  "commodityProduce"."commodityId",
+  "commodityProduce".produce,
+  "commodityProduce"."organicPractitioner",
+  "commodityProduce"."householdId",
+  "commodityProduce".year,
+  "commodityProduce"."areaUsed",
+  "commodityProduce"."farmId",
+  commodity.name AS "commodityName",
+  farm.name AS "farmName",
+  "commodityProduce"."createdAt"
 FROM
   (
-    household
-    JOIN "annualInfo" ON ((household.id = "annualInfo"."householdId"))
-  )
-GROUP BY
-  "annualInfo".year;
+    (
+      "commodityProduce"
+      JOIN commodity ON (
+        ("commodityProduce"."commodityId" = commodity.id)
+      )
+    )
+    LEFT JOIN farm ON (("commodityProduce"."farmId" = farm.id))
+  );
 
-CREATE OR REPLACE VIEW "public"."householdPrograms" AS 
- SELECT
-	household.id,
-  household.barangay,
+
+CREATE
+OR REPLACE VIEW "public"."programBeneficiaries" AS
+SELECT
+  "householdToProgram".id,
+  "householdToProgram"."programId",
+  "householdToProgram"."householdId",
+  "householdToProgram"."createdAt",
   household."firstName",
-  household."lastName",
+  household.barangay,
   household."referenceNo",
-	COALESCE(jsonb_agg("householdToProgram"."programId") FILTER (WHERE "householdToProgram"."programId" IS NOT NULL), '[]') AS "programIds",
-	sum(farm."sizeInHaTotal") AS "farmSize",
-	"annualInfo"."grossAnnualIncomeFarming",
-	"annualInfo"."grossAnnualIncomeNonfarming"
+  household."lastName",
+  "annualInfo"."grossAnnualIncomeFarming",
+  "annualInfo"."grossAnnualIncomeNonfarming",
+  farm."farmSize"
 FROM
-	household
-	LEFT JOIN "annualInfo" ON "annualInfo"."householdId" = household.id and "annualInfo"."year" = date_part('year', (SELECT current_timestamp))
-	LEFT JOIN "householdToProgram" ON household.id = "householdToProgram"."householdId"
-	LEFT JOIN farm ON farm."householdId" = household.id
-GROUP BY
-	household.id,
-	"annualInfo"."id";
+  (
+    (
+      (
+        "householdToProgram"
+        LEFT JOIN household ON (
+          (
+            household.id = "householdToProgram"."householdId"
+          )
+        )
+      )
+      LEFT JOIN "annualInfo" ON (
+        (
+          (
+            "annualInfo"."householdId" = "householdToProgram"."householdId"
+          )
+          AND (
+            ("annualInfo".year) :: double precision = date_part(
+              'year' :: text,
+              (
+                SELECT
+                  CURRENT_TIMESTAMP AS "current_timestamp"
+              )
+            )
+          )
+        )
+      )
+    )
+    LEFT JOIN (
+      SELECT
+        farm_1."householdId",
+        sum(farm_1."sizeInHaTotal") AS "farmSize"
+      FROM
+        farm farm_1
+      GROUP BY
+        farm_1."householdId"
+    ) farm ON (
+      (
+        farm."householdId" = "householdToProgram"."householdId"
+      )
+    )
+  );
 
-CREATE OR REPLACE VIEW "public"."programBeneficiaries" AS 
- SELECT "householdToProgram".id,
-    "householdToProgram"."programId",
-    "householdToProgram"."householdId",
-    "householdToProgram"."createdAt",
-    household."firstName",
-     household."barangay",
-     household."referenceNo",
-    household."lastName",
-		  household."createdAt",
-    "annualInfo"."grossAnnualIncomeFarming",
-    "annualInfo"."grossAnnualIncomeNonfarming",
-    farm."farmSize"
-   FROM ((("householdToProgram"
-     LEFT JOIN household ON ((household.id = "householdToProgram"."householdId")))
-     LEFT JOIN "annualInfo" ON ((("annualInfo"."householdId" = "householdToProgram"."householdId") AND (("annualInfo".year)::double precision = date_part('year'::text, ( SELECT CURRENT_TIMESTAMP AS "current_timestamp"))))))
-     LEFT JOIN ( SELECT farm_1."householdId",
-            sum(farm_1."sizeInHaTotal") AS "farmSize"
-           FROM farm farm_1
-          GROUP BY farm_1."householdId") farm ON ((farm."householdId" = "householdToProgram"."householdId")));
+
+CREATE OR REPLACE VIEW "public"."registeredHouseholdPerYear" AS
+SELECT
+	count(
+		household.id) AS count,
+	"annualInfo".year
+FROM (
+	household
+	JOIN "annualInfo" ON ((household.id = "annualInfo"."householdId")))
+GROUP BY
+	"annualInfo".year;
