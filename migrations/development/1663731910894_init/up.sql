@@ -277,10 +277,10 @@ SELECT
         "annualInfo"."grossAnnualIncomeNonfarming",
         (0) :: numeric
       )
-    )
+    )/1000
   ) AS averageinfo,
-  avg("annualInfo"."grossAnnualIncomeFarming") AS "annualIncomeFarming",
-  avg("annualInfo"."grossAnnualIncomeNonfarming") AS "annualIncomeNonfarming",
+  avg("annualInfo"."grossAnnualIncomeFarming")/1000 AS "annualIncomeFarming",
+  avg("annualInfo"."grossAnnualIncomeNonfarming")/1000 AS "annualIncomeNonfarming",
   "annualInfo".year
 FROM
   "annualInfo"
@@ -291,7 +291,8 @@ CREATE
 OR REPLACE VIEW "public"."inventoryOfLivestock" AS
 SELECT
   sum("commodityProduce".produce) AS sum,
-  "commodityProduce".year
+  "commodityProduce".year,
+  commodity.name
 FROM
   (
     "commodityProduce"
@@ -305,7 +306,7 @@ FROM
     )
   )
 GROUP BY
-  "commodityProduce".year;
+  "commodityProduce".year, commodity.name;
 
 CREATE
 OR REPLACE VIEW "public"."produce" AS
@@ -346,7 +347,8 @@ SELECT
   household."lastName",
   "annualInfo"."grossAnnualIncomeFarming",
   "annualInfo"."grossAnnualIncomeNonfarming",
-  farm."farmSize"
+  farm."farmSize",
+  produce."commodities"
 FROM
   (
     (
@@ -370,7 +372,7 @@ FROM
                 SELECT
                   CURRENT_TIMESTAMP AS "current_timestamp"
               )
-            )
+            )-1
           )
         )
       )
@@ -388,7 +390,21 @@ FROM
         farm."householdId" = "householdToProgram"."householdId"
       )
     )
+    LEFT JOIN (
+    	SELECT COALESCE(jsonb_agg("commodity"."id"),'[]'::jsonb) AS "commodities"
+    		,"commodityProduce"."householdId" AS "householdId"
+    		from commodity
+    		LEFT JOIN "commodityProduce" ON "commodityProduce"."commodityId" = commodity.id
+    			AND ("commodityProduce".year) :: double precision = date_part(
+              'year' :: text,
+              (
+                SELECT CURRENT_TIMESTAMP AS "current_timestamp"
+              )
+            )-1
+            group by "commodityProduce"."householdId"
+    ) AS produce ON (produce."householdId"="householdToProgram"."householdId")
   );
+
 
 
 CREATE OR REPLACE VIEW "public"."registeredHouseholdPerYear" AS
@@ -401,3 +417,43 @@ FROM (
 	JOIN "annualInfo" ON ((household.id = "annualInfo"."householdId")))
 GROUP BY
 	"annualInfo".year;
+
+CREATE
+OR REPLACE VIEW "public"."householdPrograms" AS
+  SELECT household.id,
+    household.barangay,
+    household."firstName",
+    household."lastName",
+    household."referenceNo",
+    household."createdAt",
+    COALESCE(jsonb_agg("householdToProgram"."programId") FILTER (WHERE "householdToProgram"."programId" IS NOT NULL), '[]'::jsonb) AS "programIds",
+    sum(farm."sizeInHaTotal") AS "farmSize",
+    "annualInfo"."grossAnnualIncomeFarming",
+    "annualInfo"."grossAnnualIncomeNonfarming",
+    produce.commodities
+   FROM household
+     LEFT JOIN "annualInfo" ON "annualInfo"."householdId" = household.id AND "annualInfo".year::double precision = date_part('year'::text, ( SELECT CURRENT_TIMESTAMP AS "current_timestamp"))-1
+     LEFT JOIN "householdToProgram" ON household.id = "householdToProgram"."householdId"
+     LEFT JOIN farm ON farm."householdId" = household.id
+     LEFT JOIN (
+    	SELECT COALESCE(jsonb_agg("commodity"."id"),'[]'::jsonb) AS "commodities"
+    		,"commodityProduce"."householdId" AS "hhId"
+    		from commodity
+    		LEFT JOIN "commodityProduce" ON "commodityProduce"."commodityId" = commodity.id
+    			AND ("commodityProduce".year) :: double precision = date_part(
+              'year' :: text,
+              (
+                SELECT CURRENT_TIMESTAMP AS "current_timestamp"
+              )
+            )-1
+            group by "hhId"
+    ) AS produce ON (produce."hhId"="householdToProgram"."householdId")
+  GROUP BY household.id, "annualInfo".id, produce.commodities;
+
+CREATE OR REPLACE VIEW "public"."cropProduce" AS 
+ SELECT sum("commodityProduce".produce) AS sum,
+    "commodityProduce".year,
+    commodity.name
+   FROM ("commodityProduce"
+     JOIN commodity ON (((commodity.id = "commodityProduce"."commodityId") AND ((commodity."commodityType")::text <> 'Livestock'::text))))
+  GROUP BY "commodityProduce".year, commodity.name;
