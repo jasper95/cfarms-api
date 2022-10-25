@@ -292,7 +292,8 @@ OR REPLACE VIEW "public"."inventoryOfLivestock" AS
 SELECT
   sum("commodityProduce".produce) AS sum,
   "commodityProduce".year,
-  commodity.name
+  commodity.name,
+  commodity.id AS "commodityId"
 FROM
   (
     "commodityProduce"
@@ -306,32 +307,28 @@ FROM
     )
   )
 GROUP BY
-  "commodityProduce".year, commodity.name;
+  "commodityProduce".year, commodity.name, commodity.id;
 
 CREATE
 OR REPLACE VIEW "public"."produce" AS
-SELECT
-  DISTINCT "commodityProduce".id,
-  "commodityProduce"."commodityId",
-  "commodityProduce".produce,
-  "commodityProduce"."organicPractitioner",
-  "commodityProduce"."householdId",
-  "commodityProduce".year,
-  "commodityProduce"."areaUsed",
-  "commodityProduce"."farmId",
-  commodity.name AS "commodityName",
-  farm.name AS "farmName",
-  "commodityProduce"."createdAt"
-FROM
-  (
-    (
-      "commodityProduce"
-      JOIN commodity ON (
-        ("commodityProduce"."commodityId" = commodity.id)
-      )
-    )
-    LEFT JOIN farm ON (("commodityProduce"."farmId" = farm.id))
-  );
+ SELECT DISTINCT "commodityProduce".id,
+    "commodityProduce"."commodityId",
+    "commodityProduce".produce,
+    "commodityProduce"."organicPractitioner",
+    "commodityProduce"."householdId",
+    "commodityProduce".year,
+    "commodityProduce"."areaUsed",
+    "commodityProduce"."farmId",
+    commodity.name AS "commodityName",
+    farm.name AS "farmName",
+    "commodityProduce"."createdAt",
+    commodity."commodityType",
+    CONCAT(household."firstName",' ', household."lastName") as "householdName"
+   FROM (("commodityProduce"
+     JOIN commodity ON (("commodityProduce"."commodityId" = commodity.id)))
+     LEFT JOIN farm ON (("commodityProduce"."farmId" = farm.id)))
+     LEFT JOIN household ON household.id = "commodityProduce"."householdId";
+
 
 
 CREATE
@@ -408,7 +405,7 @@ FROM
 
 
 CREATE OR REPLACE VIEW "public"."registeredHouseholdPerYear" AS
-SELECT
+  SELECT
 	count(
 		household.id) AS count,
 	"annualInfo".year
@@ -417,7 +414,6 @@ FROM (
 	JOIN "annualInfo" ON ((household.id = "annualInfo"."householdId")))
 GROUP BY
 	"annualInfo".year;
-
 CREATE
 OR REPLACE VIEW "public"."householdPrograms" AS
   SELECT household.id,
@@ -427,33 +423,46 @@ OR REPLACE VIEW "public"."householdPrograms" AS
     household."referenceNo",
     household."createdAt",
     COALESCE(jsonb_agg("householdToProgram"."programId") FILTER (WHERE "householdToProgram"."programId" IS NOT NULL), '[]'::jsonb) AS "programIds",
-    sum(farm."sizeInHaTotal") AS "farmSize",
     "annualInfo"."grossAnnualIncomeFarming",
     "annualInfo"."grossAnnualIncomeNonfarming",
-    produce.commodities
+    "farm_1"."farmSize",
+    COALESCE(jsonb_agg("commodity"."name"),'[]'::jsonb) AS "commodities",
+    COALESCE(jsonb_agg("commodity"."id"),'[]'::jsonb) AS "commodityIds"
    FROM household
-     LEFT JOIN "annualInfo" ON "annualInfo"."householdId" = household.id AND "annualInfo".year::double precision = date_part('year'::text, ( SELECT CURRENT_TIMESTAMP AS "current_timestamp"))-1
-     LEFT JOIN "householdToProgram" ON household.id = "householdToProgram"."householdId"
-     LEFT JOIN farm ON farm."householdId" = household.id
-     LEFT JOIN (
-    	SELECT COALESCE(jsonb_agg("commodity"."id"),'[]'::jsonb) AS "commodities"
-    		,"commodityProduce"."householdId" AS "hhId"
-    		from commodity
-    		LEFT JOIN "commodityProduce" ON "commodityProduce"."commodityId" = commodity.id
-    			AND ("commodityProduce".year) :: double precision = date_part(
+   	 LEFT JOIN 
+   	 (select sum(farm."sizeInHaTotal")  as "farmSize", farm."householdId" from farm group by farm."householdId") as farm_1
+   	 ON farm_1."householdId" = household.id
+     LEFT JOIN "annualInfo" ON "annualInfo"."householdId" = household.id
+     	AND
+	 ("annualInfo".year) :: double precision = date_part(
               'year' :: text,
-              (
-                SELECT CURRENT_TIMESTAMP AS "current_timestamp"
-              )
-            )-1
-            group by "hhId"
-    ) AS produce ON (produce."hhId"="householdToProgram"."householdId")
-  GROUP BY household.id, "annualInfo".id, produce.commodities;
+       (
+         SELECT CURRENT_TIMESTAMP AS "current_timestamp"
+       )
+     )-1      
+     LEFT JOIN "householdToProgram" ON household.id = "householdToProgram"."householdId"
+     LEFT JOIN "commodityProduce" ON "commodityProduce"."householdId" = household.id
+     	and ("commodityProduce".year) :: double precision = date_part(
+              'year' :: text,
+       (
+         SELECT CURRENT_TIMESTAMP AS "current_timestamp"
+       )
+     )-1
+     LEFT JOIN commodity ON commodity.id = "commodityProduce"."commodityId"     
+  GROUP BY household.id, "annualInfo".id, "farm_1"."farmSize";
+
+
 
 CREATE OR REPLACE VIEW "public"."cropProduce" AS 
  SELECT sum("commodityProduce".produce) AS sum,
     "commodityProduce".year,
-    commodity.name
+    commodity.name,
+    commodity.id AS "commodityId"
    FROM ("commodityProduce"
      JOIN commodity ON (((commodity.id = "commodityProduce"."commodityId") AND ((commodity."commodityType")::text <> 'Livestock'::text))))
-  GROUP BY "commodityProduce".year, commodity.name;
+  GROUP BY "commodityProduce".year, commodity.name, commodity.id;
+
+CREATE OR REPLACE VIEW "public"."registeredFarmers" AS 
+ SELECT COUNT("householdId"), "year"
+	FROM "annualInfo" 
+	GROUP BY "year";
