@@ -414,6 +414,8 @@ FROM (
 	JOIN "annualInfo" ON ((household.id = "annualInfo"."householdId")))
 GROUP BY
 	"annualInfo".year;
+
+  
 CREATE
 OR REPLACE VIEW "public"."householdPrograms" AS
   SELECT household.id,
@@ -461,8 +463,3 @@ CREATE OR REPLACE VIEW "public"."cropProduce" AS
    FROM ("commodityProduce"
      JOIN commodity ON (((commodity.id = "commodityProduce"."commodityId") AND ((commodity."commodityType")::text <> 'Livestock'::text))))
   GROUP BY "commodityProduce".year, commodity.name, commodity.id;
-
-CREATE OR REPLACE VIEW "public"."registeredFarmers" AS 
- SELECT COUNT("householdId"), "year"
-	FROM "annualInfo" 
-	GROUP BY "year";
