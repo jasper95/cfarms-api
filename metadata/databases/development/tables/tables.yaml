@@ -1,3 +1,4 @@
+- "!include public_account.yaml"
 - "!include public_annualInfo.yaml"
 - "!include public_association.yaml"
 - "!include public_associationBeneficiaries.yaml"
@@ -16,4 +17,6 @@
 - "!include public_program.yaml"
 - "!include public_programBeneficiaries.yaml"
 - "!include public_registeredHouseholdPerYear.yaml"
+- "!include public_session.yaml"
 - "!include public_user.yaml"
+- "!include public_verificationToken.yaml"
