@@ -459,3 +459,12 @@ SELECT sum("commodityProduce".produce) AS produce,
    FROM ("commodityProduce"
      JOIN commodity ON (((commodity.id = "commodityProduce"."commodityId") AND ((commodity."commodityType")::text = 'Crop'::text))))
   GROUP BY "commodityProduce".year, commodity.name, commodity.id;
+
+CREATE OR REPLACE VIEW "public"."fisheriesProduce" AS 
+ SELECT sum("commodityProduce".produce) AS produce,
+    "commodityProduce".year,
+    commodity.name,
+    commodity.id AS "commodityId"
+   FROM ("commodityProduce"
+     JOIN commodity ON (((commodity.id = "commodityProduce"."commodityId") AND ((commodity."commodityType")::text = 'Fisheries'::text))))
+  GROUP BY "commodityProduce".year, commodity.name, commodity.id;
