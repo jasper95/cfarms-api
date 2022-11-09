@@ -450,14 +450,15 @@ CREATE OR REPLACE VIEW "public"."householdPrograms" AS
 
 
 CREATE OR REPLACE VIEW "public"."cropProduce" AS 
-SELECT sum("commodityProduce".produce) AS produce,
+ SELECT sum("commodityProduce".produce) AS produce,
     "commodityProduce".year,
     commodity.name,
-    sum("commodityProduce"."areaUsed") as "areaUsed",
-    sum("commodityProduce".produce)/sum("commodityProduce"."areaUsed")::float as yield,
+    sum("commodityProduce"."areaUsed") AS "areaUsed",
+    sum("commodityProduce".produce) / sum("commodityProduce"."areaUsed") AS yield,
+    sum("commodityProduce"."areaUsed") as "areaHarvested",
     commodity.id AS "commodityId"
-   FROM ("commodityProduce"
-     JOIN commodity ON (((commodity.id = "commodityProduce"."commodityId") AND ((commodity."commodityType")::text = 'Crop'::text))))
+   FROM "commodityProduce"
+     JOIN commodity ON commodity.id = "commodityProduce"."commodityId" AND commodity."commodityType"::text = 'Crop'::text
   GROUP BY "commodityProduce".year, commodity.name, commodity.id;
 
 CREATE OR REPLACE VIEW "public"."fisheriesProduce" AS 
@@ -468,3 +469,15 @@ CREATE OR REPLACE VIEW "public"."fisheriesProduce" AS
    FROM ("commodityProduce"
      JOIN commodity ON (((commodity.id = "commodityProduce"."commodityId") AND ((commodity."commodityType")::text = 'Fisheries'::text))))
   GROUP BY "commodityProduce".year, commodity.name, commodity.id;
+
+CREATE OR REPLACE VIEW "public"."farmView" AS 
+ SELECT farm.name,
+    farm.id,
+    household.id as "householdId",
+    household."firstName",
+    household."lastName",
+    farm."sizeInHaTotal",
+    farm."ownerName",
+    farm."ownershipType"
+   FROM farm inner join
+    household on farm."householdId"=household.id;
