@@ -480,6 +480,7 @@ CREATE OR REPLACE VIEW "public"."farmView" AS
     farm."ownerName",
     farm."ownershipType",
     farm."createdAt",
-    farm."location"
+    farm."location",
+    farm.barangay
    FROM farm inner join
     household on farm."householdId"=household.id;
