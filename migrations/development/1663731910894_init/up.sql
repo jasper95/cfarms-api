@@ -194,6 +194,7 @@ CREATE TABLE public."commodityProduce" (
 	"year" int4 NOT NULL,
 	"areaUsed" float8 NOT NULL,
   "produceInUnit" float8 NULL,
+  "farmSize" float8 NULL,
   "unit" text NOT NULL DEFAULT 'MT',
 	"createdAt" TIMESTAMP NOT NULL DEFAULT now(),
 	"updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
