@@ -485,3 +485,17 @@ CREATE OR REPLACE VIEW "public"."farmView" AS
     farm.barangay
    FROM farm inner join
     household on farm."householdId"=household.id;
+
+CREATE OR REPLACE VIEW "public"."householdView" AS 
+ SELECT household."referenceNo",
+   CONCAT(household."firstName",' ', household."lastName") as name,
+   household.barangay as "barangay",
+   COALESCE("annualInfo"."mainLivelihood") AS "mainLivelihood"
+ from household left join "annualInfo" on household.id = "annualInfo"."householdId" 
+   AND "annualInfo"."year" ::double precision 
+     =(date_part('year' :: text,
+          (
+            SELECT CURRENT_TIMESTAMP AS "current_timestamp"
+          )
+        ) - (1) :: double precision
+    )

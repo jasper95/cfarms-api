@@ -8,6 +8,7 @@ DROP VIEW public."associationPrograms";
 DROP VIEW public."associationBeneficiaries";
 DROP VIEW public."cropProduce";
 DROP VIEW public."fisheriesProduce";
+DROP VIEW public."householdView";
 DROP TABLE public."user";
 DROP TABLE public."commodityProduce";
 DROP TABLE public."annualInfo";
