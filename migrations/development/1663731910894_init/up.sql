@@ -487,15 +487,23 @@ CREATE OR REPLACE VIEW "public"."farmView" AS
     household on farm."householdId"=household.id;
 
 CREATE OR REPLACE VIEW "public"."householdView" AS 
- SELECT household."referenceNo",
-   CONCAT(household."firstName",' ', household."lastName") as name,
-   household.barangay as "barangay",
-   COALESCE("annualInfo"."mainLivelihood") AS "mainLivelihood"
- from household left join "annualInfo" on household.id = "annualInfo"."householdId" 
-   AND "annualInfo"."year" ::double precision 
-     =(date_part('year' :: text,
-          (
-            SELECT CURRENT_TIMESTAMP AS "current_timestamp"
-          )
-        ) - (1) :: double precision
-    )
+ SELECT household.id,
+    household."referenceNo",
+    concat(household."firstName", ' ', household."lastName") AS name,
+    household.barangay,
+    COALESCE(jsonb_agg("annualInfo"."mainLivelihood"), '[]'::jsonb) AS "mainLivelihood",
+    household."lastName",
+    household."firstName",
+    household."middleName",
+    household."femaleCount",
+    household."maleCount",
+    household."is4psBeneficiary",
+    household."ipMembership",
+    household."createdAt"
+   FROM household
+     LEFT JOIN "annualInfo" 
+     ON household.id = "annualInfo"."householdId" 
+     AND "annualInfo".year::double precision 
+        = (date_part('year'::text, 
+          ( SELECT CURRENT_TIMESTAMP AS "current_timestamp")) - 1::double precision)
+  GROUP BY household.id;
